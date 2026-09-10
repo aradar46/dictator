@@ -1,0 +1,7 @@
+.flatpak-repo/
+.flatpak-builder/
+build-dir/
+*.flatpak
+__pycache__/
+*.log
+icon_blue_bg.png
