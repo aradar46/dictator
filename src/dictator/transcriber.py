@@ -12,7 +12,8 @@ import shutil
 ENGINE_COMMIT = "306c88f4d1286aec1bf96e544632897886af5501"  # whisper.cpp v1.9.2
 MODEL_REVISION = "5359861c739e955e79d9a303bcbc70fb988958b1"
 MODEL_SHA256 = "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"
-ROOT = Path(os.path.expanduser("~/.cache/dictator"))
+# Inside Flatpak this is the app's private cache; on a host run it is ~/.cache.
+ROOT = Path(GLib.get_user_cache_dir()) / "dictator"
 ENGINE_SOURCE = ROOT / ("whisper.cpp-" + ENGINE_COMMIT)
 
 

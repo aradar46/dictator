@@ -36,6 +36,7 @@ class Dictator(Adw.Application):
         self.shortcut_trigger = None
         self.downloading_model = None
         self.download_cancel = None
+        self.needs_model = False
         cfg = load_config()
         self.selected_mic_device = cfg.get("mic_device", None)
         self.selected_mic_name = cfg.get("mic_name", "System Default")
@@ -196,7 +197,25 @@ class Dictator(Adw.Application):
             self.enable()
         return GLib.SOURCE_REMOVE
 
+    def prompt_for_model(self):
+        """First run: no model on disk yet. Offer to fetch the default one."""
+        model = MODELS[self.transcriber.model_name]
+        self.needs_model = True
+        self.dictation.state = "setup"
+        self.label.set_label("One thing first")
+        self.detail.set_label(
+            f"Dictator transcribes on your machine, so it needs a speech model.\n"
+            f"{model['label']} is a good default. Other sizes are in the menu."
+        )
+        self.button.set_label(f"Download {model['label']} ({model['size']})")
+        self.button.add_css_class("suggested-action")
+        self.button.set_sensitive(True)
+        self.button.set_visible(True)
+        self.settings_btn.set_sensitive(True)
+
     def on_button_clicked(self, button):
+        if self.needs_model:
+            return self.choose_model(self.transcriber.model_name)
         if self.dictation.state == "idle":
             self.window.set_visible(False)
         else:
@@ -320,6 +339,10 @@ class Dictator(Adw.Application):
             self.refresh_model_popover()
             self.settings_popover.popdown()
             self.toast(f"Switched to Whisper {MODELS[key]['label']}")
+            if self.needs_model:
+                self.needs_model = False
+                self.button.remove_css_class("suggested-action")
+                self.enable()
             return
         if self.downloading_model:
             return
@@ -329,6 +352,11 @@ class Dictator(Adw.Application):
         self.dl_box.set_visible(True)
         self.download_progress.set_fraction(0.0)
         self.download_progress.set_text(f"Downloading {MODELS[key]['label']}...")
+        if self.needs_model:
+            self.meter.set_value(0)
+            self.detail.set_label("Downloading the speech model\nStarting…")
+            self.button.set_label("Downloading…")
+            self.button.set_sensitive(False)
         download_model_async(
             key,
             self.on_download_progress,
@@ -343,10 +371,18 @@ class Dictator(Adw.Application):
         self.dl_box.set_visible(False)
         self.refresh_model_popover()
         self.toast("Download cancelled")
+        if self.needs_model:
+            self.meter.set_value(0)
+            self.prompt_for_model()
 
     def on_download_progress(self, frac, done, total):
+        text = f"{int(frac * 100)}% ({done // (1024 * 1024)}MB / {total // (1024 * 1024)}MB)"
         self.download_progress.set_fraction(frac)
-        self.download_progress.set_text(f"{int(frac * 100)}% ({done // (1024 * 1024)}MB / {total // (1024 * 1024)}MB)")
+        self.download_progress.set_text(text)
+        if self.needs_model:
+            # Started from the main window, where the popover's progress bar isn't visible.
+            self.meter.set_value(frac)
+            self.detail.set_label(f"Downloading the speech model\n{text}")
 
     def on_download_done(self, key, success, error):
         self.downloading_model = None
@@ -358,14 +394,21 @@ class Dictator(Adw.Application):
             self.refresh_model_popover()
             self.settings_popover.popdown()
             self.toast(f"Whisper {MODELS[key]['label']} ready")
+            if self.needs_model:
+                self.needs_model = False
+                self.button.remove_css_class("suggested-action")
+                self.enable()
         else:
             self.refresh_model_popover()
             if error:
                 self.toast(f"Download failed: {error}")
+            if self.needs_model:
+                self.meter.set_value(0)
+                self.prompt_for_model()   # back to a usable button, not a dead one
 
     def enable(self, button=None):
         if not self.transcriber.available():
-            return self.dictation.fail(f"The speech engine or model '{self.transcriber.model_name}' is missing.")
+            return self.prompt_for_model()
         if self.portal and self.portal.session:
             self.dictation.state = "idle"
             return self.update_idle_ui()

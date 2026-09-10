@@ -167,10 +167,25 @@ with tempfile.TemporaryDirectory() as directory, patch.object(app.GLib, "get_use
     h.transcriber = Mock()
     h.transcriber.model_name = "base"
     h.downloading_model = None
+    h.needs_model = False
     h.toast = Mock()
     h.update_idle_ui = Mock()
     h.refresh_model_popover = lambda: app.Dictator.refresh_model_popover(h)
     h.choose_model = lambda key: app.Dictator.choose_model(h, key)
+    # First run with no model must offer a download, not dead-end on "stopped".
+    f = SimpleNamespace()
+    f.dictation = SimpleNamespace(state="setup")
+    f.transcriber = Mock()
+    f.transcriber.model_name = "small-q5"
+    f.transcriber.available.return_value = False
+    f.needs_model = False
+    f.label, f.detail, f.button, f.settings_btn = Mock(), Mock(), Mock(), Mock()
+    f.prompt_for_model = lambda: app.Dictator.prompt_for_model(f)
+    app.Dictator.enable(f)
+    assert f.needs_model, "missing model must put the app in the download prompt"
+    assert f.dictation.state == "setup", "missing model must not enter the error state"
+    assert "Download" in f.button.set_label.call_args.args[0]
+
     with patch.object(app, "model_exists", return_value=True):
         h.choose_model("small")
         h.transcriber.set_model.assert_called_with("small")

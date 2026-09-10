@@ -26,7 +26,7 @@ runtime=org.gnome.Platform/$arch/50
 sdk=org.gnome.Sdk/$arch/50
 command=dictator
 EOF
-flatpak build-finish --socket=wayland --socket=pulseaudio --device=dri --share=network --filesystem=xdg-cache/dictator:create --talk-name=org.kde.StatusNotifierWatcher "$build_dir"
+flatpak build-finish --socket=wayland --socket=pulseaudio --device=dri --share=network --talk-name=org.kde.StatusNotifierWatcher "$build_dir"
 flatpak build-export --arch="$arch" .flatpak-repo "$build_dir" dictator
 flatpak build-bundle .flatpak-repo Dictator.flatpak "$app_id" dictator
 flatpak install --user --noninteractive --assumeyes ./Dictator.flatpak

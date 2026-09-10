@@ -13,8 +13,6 @@ finish-args:
   - --socket=pulseaudio
   # Whisper models are downloaded from huggingface.co on first use.
   - --share=network
-  # Engine build, downloaded models and the config file.
-  - --filesystem=xdg-cache/dictator:create
   # Tray icon (org.kde.StatusNotifierItem); absent on desktops without a watcher.
   - --talk-name=org.kde.StatusNotifierWatcher
 
