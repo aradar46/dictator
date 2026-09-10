@@ -9,7 +9,7 @@
 
   <description>
     <p>
-      Dictator turns a keyboard shortcut into dictation that works in any window.
+      Hold To Dictate, Locally. Dictator turns a keyboard shortcut into dictation that works in any window.
       Hold the shortcut, speak, release it, and the transcript is copied to the
       clipboard ready to paste.
     </p>
@@ -63,7 +63,7 @@
   </branding>
 
   <releases>
-    <release version="0.1" date="2026-09-10">
+    <release version="0.1.0" date="2026-09-10">
       <description>
         <p>First release.</p>
       </description>

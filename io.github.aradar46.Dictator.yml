@@ -5,11 +5,12 @@ sdk: org.gnome.Sdk
 command: dictator
 
 finish-args:
+  # Wayland only: the shortcut needs a Wayland surface handle to bind through
+  # the portal, and the app refuses to run elsewhere, so no X11 fallback.
   - --socket=wayland
-  - --socket=fallback-x11
-  - --share=ipc
+  # GPU rendering for the GTK4 window.
   - --device=dri
-  # Microphone capture.
+  # Microphone capture (this is the PipeWire socket on modern systems).
   - --socket=pulseaudio
   # Whisper models are downloaded from huggingface.co on first use.
   - --share=network

@@ -73,7 +73,7 @@ class Dictator(Adw.Application):
         about = Adw.AboutWindow(
             application_name="Dictator",
             application_icon="io.github.aradar46.Dictator",
-            version="0.1",
+            version="0.1.0",
             developer_name="Aradar46",
             comments="Hold a global shortcut, record audio, transcribe it locally, and paste the result.",
             website="https://github.com/aradar46/dictator",
@@ -161,6 +161,17 @@ class Dictator(Adw.Application):
         change_btn.connect("clicked", lambda _: self.open_shortcut_settings())
         shortcut_row.append(change_btn)
         outer.append(shortcut_row)
+        outer.append(Gtk.Separator())
+
+        quit_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        quit_row.append(Gtk.Label(label="Dictator keeps listening in the background",
+                                  halign=Gtk.Align.START, hexpand=True, wrap=True,
+                                  css_classes=["dim-label"]))
+        quit_btn = Gtk.Button(label="Quit")
+        quit_btn.set_tooltip_text("Stop Dictator and release the shortcut (Ctrl+Q)")
+        quit_btn.connect("clicked", lambda _: self.quit())
+        quit_row.append(quit_btn)
+        outer.append(quit_row)
 
         self.settings_popover.set_child(outer)
         self.refresh_mic_popover()

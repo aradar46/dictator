@@ -28,9 +28,21 @@ Pick a Whisper model from the settings menu ("..." in the header bar), let it do
 
 Hold the shortcut, speak, release, Ctrl+V. Esc cancels mid-recording.
 
-```sh
-flatpak kill io.github.aradar46.Dictator   # quit the background process
-```
+"Hide to Background" keeps Dictator running so the shortcut still works while the window is gone. To stop it: **Quit** in the menu, Ctrl+Q, the tray icon's Quit, or closing the window while it's idle. It does not autostart; once quit, it stays quit until you launch it again.
+
+## Permissions
+
+The Flatpak asks for four things and nothing else. No filesystem access, no home directory, no arbitrary D-Bus.
+
+| Permission | Why |
+|---|---|
+| `--socket=wayland` | Draws the window, and the shortcut portal needs a Wayland surface handle to bind against. Wayland only, so there is no X11 fallback. |
+| `--socket=pulseaudio` | Records the microphone. This is the PipeWire socket on current systems. |
+| `--share=network` | Downloads the Whisper model from huggingface.co on first use. Nothing is uploaded, and nothing else talks to the network. |
+| `--device=dri` | GPU rendering for the GTK4 window. |
+| `--talk-name=org.kde.StatusNotifierWatcher` | The optional tray icon. Absent on desktops without a StatusNotifier watcher, and the app works fine without it. |
+
+Models and settings live in the app's own sandboxed cache (`~/.var/app/io.github.aradar46.Dictator/`), not in your home directory.
 
 ## Develop
 
