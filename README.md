@@ -6,8 +6,22 @@ Dictator is a small GTK4/libadwaita app for GNOME. Hold a shortcut, speak, relea
 
 ## Install
 
+Download `Dictator.flatpak` from the [latest release](https://github.com/aradar46/dictator/releases/latest), then:
+
+```sh
+flatpak install --user Dictator.flatpak
+flatpak run io.github.aradar46.Dictator
+```
+
+It needs the GNOME runtime, which most systems already have:
+
 ```sh
 flatpak info org.gnome.Platform//50 || flatpak install flathub org.gnome.Platform//50
+```
+
+## Build it yourself
+
+```sh
 python3 setup-transcription.py   # builds whisper.cpp into ~/.cache/dictator
 bash build-flatpak.sh
 flatpak run io.github.aradar46.Dictator
