@@ -1,4 +1,4 @@
-"""XDG Desktop Portal Global Shortcuts integration for Moonshine Dictate."""
+"""XDG Desktop Portal Global Shortcuts integration for Dictator."""
 import uuid
 from gi.repository import Gio, GLib
 
@@ -40,7 +40,7 @@ class PortalShortcuts:
                 (
                     "dictate",
                     {
-                        "description": GLib.Variant("s", "Toggle Moonshine Voice Dictation"),
+                        "description": GLib.Variant("s", "Toggle Dictator Dictation"),
                         "preferred_trigger": GLib.Variant("s", "CTRL+ALT+space"),
                     },
                 )
@@ -66,7 +66,7 @@ class PortalShortcuts:
         self._call("CreateSession", "(a{sv})", (), on_session_created)
 
     def _call(self, method, signature, args, callback):
-        token = "moonshine_" + uuid.uuid4().hex
+        token = "dictator_" + uuid.uuid4().hex
         sender = self.bus.get_unique_name()[1:].replace(".", "_")
         path = f"{ROOT}/request/{sender}/{token}"
 
@@ -92,7 +92,7 @@ class PortalShortcuts:
         )
         opts = {"handle_token": GLib.Variant("s", token)}
         if method == "CreateSession":
-            opts["session_handle_token"] = GLib.Variant("s", "moonshine_" + uuid.uuid4().hex)
+            opts["session_handle_token"] = GLib.Variant("s", "dictator_" + uuid.uuid4().hex)
 
         def on_call_done(conn, result):
             try:

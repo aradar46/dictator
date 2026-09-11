@@ -242,7 +242,7 @@ def create_app(manager: DictationManager) -> web.Application:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Moonshine Voice Local Dictation App")
+    parser = argparse.ArgumentParser(description="Dictator - local dictation app")
     parser.add_argument("--model", choices=["tiny", "base", "medium"], default="medium",
                         help="Model size to use (default: medium - exact same model used by moonshine.ai)")
     parser.add_argument("--host", default="127.0.0.1", help="Host interface (default: 127.0.0.1)")
@@ -285,7 +285,7 @@ def main() -> None:
 
     url = f"http://{args.host}:{args.port}"
     print(f"\n=======================================================")
-    print(f" Moonshine Dictation App running at: {url}")
+    print(f" Dictator running at: {url}")
     print(f" Model: {args.model} streaming")
     print(f" Press Ctrl+C to stop.")
     print(f"=======================================================\n")

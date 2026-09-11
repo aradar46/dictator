@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Dictator
+GenericName=Dictation
+Comment=Hold to dictate, locally. Offline speech to text.
+Exec=/home/adr/MEGA/Syncthing/tmp/hold-to-talk/dictator
+Icon=io.github.aradar46.Dictator
+Terminal=false
+Categories=Utility;
+Keywords=dictation;speech;voice;transcribe;stt;
+StartupWMClass=io.github.aradar46.Dictator

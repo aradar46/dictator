@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Moonshine Voice - Standalone Desktop Dictation Popup for GNOME Wayland."""
+"""Dictator - Standalone Desktop Dictation Popup for GNOME Wayland."""
 import argparse
 import fcntl
 import os
@@ -16,13 +16,13 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from moonshine_voice import AgentFlow, MicTranscriber, ModelArch, get_spelling_model_path
 
-APP_ID = "io.github.moonshine.Dictate"
+APP_ID = "io.github.aradar46.Dictator"
 
 _LOCK_HANDLE = None
 
 def acquire_instance_lock():
     global _LOCK_HANDLE
-    lock_file = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / f"moonshine-dictate-{os.getuid()}.lock"
+    lock_file = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / f"dictator-{os.getuid()}.lock"
     f = open(lock_file, "w")
     try:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -94,7 +94,7 @@ def copy_to_clipboard(text: str):
 
 class DictateWindow(Adw.ApplicationWindow):
     def __init__(self, app, model_name="medium", device=None):
-        super().__init__(application=app, title="Moonshine Dictate")
+        super().__init__(application=app, title="Dictator")
         self.app = app
         self.model_name = model_name
         self.device = device
@@ -122,7 +122,7 @@ class DictateWindow(Adw.ApplicationWindow):
         # Header bar
         header = Adw.HeaderBar()
         title_widget = Adw.WindowTitle(
-            title="Moonshine Dictate",
+            title="Dictator",
             subtitle=f"{self.model_name.capitalize()} Streaming Model",
         )
         header.set_title_widget(title_widget)
@@ -430,6 +430,7 @@ class DictationApp(Adw.Application):
 
     def do_activate(self):
         limit_cpu_cores(self.cpus)
+        Gtk.Window.set_default_icon_name(APP_ID)
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_display(
@@ -442,7 +443,7 @@ class DictationApp(Adw.Application):
 
 def main():
     acquire_instance_lock()
-    parser = argparse.ArgumentParser(description="Moonshine Voice Desktop Dictation Popup")
+    parser = argparse.ArgumentParser(description="Dictator - local desktop dictation popup")
     parser.add_argument("--model", choices=["tiny", "base", "medium"], default="medium",
                         help="Model size (default: medium - official website accuracy)")
     parser.add_argument("--device", default=None, help="Microphone device name or index")
