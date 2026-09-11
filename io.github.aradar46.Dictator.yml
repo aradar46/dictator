@@ -52,13 +52,14 @@ modules:
         - --share=network
     build-commands:
       - pip3 install --no-cache-dir --prefix=/app moonshine-voice==0.1.5
-      - install -Dm644 desktop_app.py /app/share/dictator/desktop_app.py
+      - install -Dm644 -t /app/share/dictator desktop_app.py shortcuts.py background.py
       - install -Dm755 flatpak-launcher.sh /app/bin/dictator
       - install -Dm644 io.github.aradar46.Dictator.desktop
         /app/share/applications/io.github.aradar46.Dictator.desktop
       # The repo copy points at a checkout path; in the sandbox it is on PATH.
       - sed -i 's|^Exec=.*|Exec=dictator|'
         /app/share/applications/io.github.aradar46.Dictator.desktop
+      - install -Dm644 LICENSE /app/share/licenses/dictator/LICENSE
       - install -Dm644 icon.png
         /app/share/icons/hicolor/512x512/apps/io.github.aradar46.Dictator.png
     sources:

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Dictator - Standalone Desktop Dictation Popup for GNOME Wayland."""
 import argparse
-import fcntl
 import os
 from pathlib import Path
 import re
@@ -12,23 +11,17 @@ import threading
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+gi.require_version("GdkWayland", "4.0")
+from gi.repository import Adw, Gdk, GdkWayland, Gio, GLib, Gtk
+
+from background import request_background
+from shortcuts import PortalShortcuts
 
 from moonshine_voice import AgentFlow, MicTranscriber, ModelArch, get_spelling_model_path
 
 APP_ID = "io.github.aradar46.Dictator"
-
-_LOCK_HANDLE = None
-
-def acquire_instance_lock():
-    global _LOCK_HANDLE
-    lock_file = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / f"dictator-{os.getuid()}.lock"
-    f = open(lock_file, "w")
-    try:
-        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        _LOCK_HANDLE = f
-    except (BlockingIOError, OSError):
-        sys.exit(0)
+VERSION = "0.2.0"
+REPO_URL = "https://github.com/aradar46/dictator"
 
 def limit_cpu_cores(num_cores: int = 2):
     """Cap process to specific number of CPU cores to avoid pegging all CPUs."""
@@ -115,6 +108,9 @@ class DictateWindow(Adw.ApplicationWindow):
 
         self.build_ui()
 
+        self.shortcuts = None
+        self.connect("map", lambda _: self.bind_shortcut())
+
         # Start loading model in background thread
         threading.Thread(target=self.load_model_worker, daemon=True).start()
 
@@ -138,6 +134,10 @@ class DictateWindow(Adw.ApplicationWindow):
         self.mic_btn.set_sensitive(False)
         self.mic_btn.connect("clicked", lambda _: self.toggle_mic())
         header.pack_start(self.mic_btn)
+
+        about_btn = Gtk.Button(icon_name="help-about-symbolic", tooltip_text="About Dictator")
+        about_btn.connect("clicked", lambda _: self.show_about())
+        header.pack_end(about_btn)
 
         # Layout
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -172,7 +172,7 @@ class DictateWindow(Adw.ApplicationWindow):
         )
 
         cancel_btn = Gtk.Button(label="Cancel (Esc)")
-        cancel_btn.connect("clicked", lambda _: self.close_app())
+        cancel_btn.connect("clicked", lambda _: self.hide_session())
         bottom_bar.append(cancel_btn)
 
         clear_btn = Gtk.Button(label="Clear")
@@ -186,7 +186,7 @@ class DictateWindow(Adw.ApplicationWindow):
         self.copy_btn.add_css_class("suggested-action")
         self.copy_btn.add_css_class("big-action")
         self.copy_btn.set_icon_name("edit-copy-symbolic")
-        self.copy_btn.connect("clicked", lambda _: self.copy_and_exit())
+        self.copy_btn.connect("clicked", lambda _: self.copy_and_hide())
         bottom_bar.append(self.copy_btn)
 
         box.append(bottom_bar)
@@ -265,6 +265,58 @@ class DictateWindow(Adw.ApplicationWindow):
             self.status_label.set_label("Paused")
             self.status_label.remove_css_class("status-listening")
             self.status_label.add_css_class("status-paused")
+
+    def bind_shortcut(self):
+        """Bind Ctrl+Alt+Space through the portal, which needs a Wayland handle."""
+        if self.shortcuts:
+            return
+        surface = self.get_surface()
+        if not isinstance(surface, GdkWayland.WaylandToplevel):
+            return
+
+        def exported(toplevel, handle, *_):
+            print(f"[shortcut] wayland handle exported", flush=True)
+            self.shortcuts = PortalShortcuts(
+                on_activated=lambda token: GLib.idle_add(self.toggle_dictation),
+                on_bound=lambda trigger, _: print(f"[shortcut] bound to {trigger}", flush=True),
+                on_error=lambda msg: print(f"[shortcut] {msg}", flush=True),
+            )
+            self.shortcuts.bind(f"wayland:{handle}")
+            request_background("Listen for the dictation shortcut while hidden")
+
+        surface.export_handle(exported)
+
+    def toggle_dictation(self):
+        """Show and listen if parked, otherwise pause and resume in place.
+        The text stays on screen either way; Enter is what copies it."""
+        if not self.get_visible():
+            self.present()
+            self.start_listening()
+        elif self.is_listening:
+            self.stop_listening()
+        else:
+            self.present()
+            self.start_listening()
+        return GLib.SOURCE_REMOVE
+
+    def show_about(self):
+        # AdwDialog renders inside the parent window and gets clipped at
+        # 560x320. AboutWindow is a real toplevel, so it sizes itself.
+        about = Adw.AboutWindow(
+            transient_for=self,
+            modal=True,
+            application_name="Dictator",
+            application_icon=APP_ID,
+            version=VERSION,
+            developer_name="aradar46",
+            developers=["aradar46 https://github.com/aradar46"],
+            website=REPO_URL,
+            issue_url=f"{REPO_URL}/issues",
+            license_type=Gtk.License.GPL_3_0,
+            comments="Hold to dictate, locally.\n"
+                     "Offline speech to text, powered by Moonshine Voice.",
+        )
+        about.present()
 
     def toggle_mic(self):
         if self.is_listening:
@@ -391,24 +443,36 @@ class DictateWindow(Adw.ApplicationWindow):
 
     def on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape:
-            self.close_app()
+            self.hide_session()
+            return True
+        elif keyval == Gdk.KEY_q and (state & Gdk.ModifierType.CONTROL_MASK):
+            self.quit_app()
             return True
         elif keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             if not (state & Gdk.ModifierType.SHIFT_MASK):
-                self.copy_and_exit()
+                self.copy_and_hide()
                 return True
         return False
 
-    def copy_and_exit(self):
+    def copy_and_hide(self):
         self.clear_provisional()
         start = self.buffer.get_start_iter()
         end = self.buffer.get_end_iter()
         text = self.buffer.get_text(start, end, False).strip()
         if text:
             copy_to_clipboard(text)
-        self.close_app()
+        self.hide_session()
 
-    def close_app(self):
+    def hide_session(self):
+        """Park the app: stop the mic, clear the buffer, keep the process alive
+        so the global shortcut still works."""
+        self.stop_listening()
+        self.clear_text()
+        self.set_visible(False)
+
+    def quit_app(self):
+        if self.shortcuts:
+            self.shortcuts.close()
         if self.agent and self.is_listening:
             try:
                 self.agent.stop_listening()
@@ -422,13 +486,18 @@ class DictationApp(Adw.Application):
     def __init__(self, model_name="medium", device=None, cpus=2):
         super().__init__(
             application_id=APP_ID,
-            flags=Gio.ApplicationFlags.NON_UNIQUE,
-        )
+            )
         self.model_name = model_name
         self.device = device
         self.cpus = cpus
 
     def do_activate(self):
+        # A hidden window must not end the process, or the shortcut dies with it.
+        self.hold()
+        if self.props.active_window:
+            self.props.active_window.present()
+            return
+
         limit_cpu_cores(self.cpus)
         Gtk.Window.set_default_icon_name(APP_ID)
         provider = Gtk.CssProvider()
@@ -438,11 +507,11 @@ class DictationApp(Adw.Application):
         )
 
         win = DictateWindow(self, model_name=self.model_name, device=self.device)
+        win.set_hide_on_close(True)
         win.present()
 
 
 def main():
-    acquire_instance_lock()
     parser = argparse.ArgumentParser(description="Dictator - local desktop dictation popup")
     parser.add_argument("--model", choices=["tiny", "base", "medium"], default="medium",
                         help="Model size (default: medium - official website accuracy)")
