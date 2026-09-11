@@ -7,18 +7,18 @@ command: dictator
 finish-args:
   - --socket=wayland
   - --device=dri
-  # Microphone capture (PipeWire socket on modern systems).
+  # Microphone capture (the PipeWire socket on current systems).
   - --socket=pulseaudio
-  # Moonshine downloads ~450 MB of .ort models to the cache on first run.
+  # Models are downloaded to the app cache on first run.
   - --share=network
 
 modules:
-  # sounddevice dlopens libportaudio, which the GNOME runtime does not ship.
+  # sounddevice needs libportaudio, which the GNOME runtime does not ship.
   - name: portaudio
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
-      # portaudio 19.7.0 declares cmake_minimum_required below what CMake 4 accepts.
+      # 19.7.0 declares a cmake_minimum_required below what CMake 4 accepts.
       - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
       - -DBUILD_SHARED_LIBS=ON
       - -DPA_BUILD_TESTS=OFF
@@ -28,11 +28,10 @@ modules:
         url: https://github.com/PortAudio/portaudio/archive/refs/tags/v19.7.0.tar.gz
         sha256: 5af29ba58bbdbb7bbcefaaecc77ec8fc413f0db6f4c4e286c40c3e1b83174fa0
 
-  # Without this the Gdk clipboard drops the selection the moment the app
-  # quits, so "Copy & Close" silently loses the dictated text.
+  # The Gdk clipboard loses the selection when the app exits.
   - name: wl-clipboard
     buildsystem: meson
-    # Completions default to absolute /usr paths, outside the build sandbox.
+    # Completions install to absolute /usr paths, outside the build prefix.
     config-opts:
       - -Dfishcompletiondir=no
       - -Dzshcompletiondir=no
@@ -43,10 +42,8 @@ modules:
 
   - name: dictator
     buildsystem: simple
-    # ponytail: pip pulls wheels live instead of vendoring pinned sources.
-    # ceiling: build is not reproducible and Flathub rejects networked builds.
-    # upgrade: run flatpak-pip-generator and swap this for pinned sources when
-    # you submit to Flathub or need byte-identical rebuilds.
+    # Wheels are fetched at build time. For a reproducible or Flathub build,
+    # replace this with pinned sources from flatpak-pip-generator.
     build-options:
       build-args:
         - --share=network
@@ -56,7 +53,7 @@ modules:
       - install -Dm755 flatpak-launcher.sh /app/bin/dictator
       - install -Dm644 io.github.aradar46.Dictator.desktop
         /app/share/applications/io.github.aradar46.Dictator.desktop
-      # The repo copy points at a checkout path; in the sandbox it is on PATH.
+      # The repo copy points at a checkout path; here it is on PATH.
       - sed -i 's|^Exec=.*|Exec=dictator|'
         /app/share/applications/io.github.aradar46.Dictator.desktop
       - install -Dm644 LICENSE /app/share/licenses/dictator/LICENSE

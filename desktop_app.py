@@ -277,11 +277,9 @@ class DictateWindow(Adw.ApplicationWindow):
             return
 
         def exported(toplevel, handle, *_):
-            print(f"[shortcut] wayland handle exported", flush=True)
             self.shortcuts = PortalShortcuts(
                 on_activated=lambda token: GLib.idle_add(self.toggle_dictation, token),
-                on_bound=lambda trigger, _: print(f"[shortcut] bound to {trigger}", flush=True),
-                on_error=lambda msg: print(f"[shortcut] {msg}", flush=True),
+                on_error=lambda msg: print(f"Shortcut: {msg}", file=sys.stderr),
             )
             self.shortcuts.bind(f"wayland:{handle}")
             request_background("Listen for the dictation shortcut while hidden")
@@ -289,14 +287,13 @@ class DictateWindow(Adw.ApplicationWindow):
         surface.export_handle(exported)
 
     def present_with_token(self, token):
-        """Wayland only raises a window that presents an activation token."""
+        """Raise the window. Wayland needs the portal's activation token."""
         if token:
             self.set_startup_id(token)
         self.present()
 
     def toggle_dictation(self, token=None):
-        """Show and listen if parked, otherwise pause and resume in place.
-        The text stays on screen either way; Enter is what copies it."""
+        """Show and listen when parked, otherwise pause or resume in place."""
         if self.is_listening:
             self.stop_listening()
         else:
@@ -305,8 +302,7 @@ class DictateWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def show_about(self):
-        # AdwDialog renders inside the parent window and gets clipped at
-        # 560x320. AboutWindow is a real toplevel, so it sizes itself.
+        # AdwDialog is clipped by the 560x320 parent window.
         about = Adw.AboutWindow(
             transient_for=self,
             modal=True,
@@ -324,20 +320,18 @@ class DictateWindow(Adw.ApplicationWindow):
         about.present()
 
     def release_microphone(self):
-        """AgentFlow.stop_listening() stops the transcriber but leaves the
-        PortAudio stream open, so GNOME keeps showing the recording indicator.
-        MicTranscriber.close() would release it but also tears down the loaded
-        model.
-        ponytail: reaches into _sd_stream; MicTranscriber.start() recreates it
-        on its own, so this is the library's own resume path.
-        ceiling: private attribute, may move in a moonshine-voice update.
-        upgrade: drop this once the library grows a public pause/release call."""
+        """Close the audio stream so the desktop stops showing a recording icon.
+
+        stop_listening() halts transcription but leaves the stream open.
+        close() would release it but also drops the loaded model, so close
+        the stream directly; start() reopens it when _sd_stream is None.
+        """
         stream = getattr(self.mic, "_sd_stream", None)
         if stream is not None:
             try:
                 stream.close()
-            except Exception as e:
-                print(f"[mic] release failed: {e}", flush=True)
+            except Exception:
+                pass
             self.mic._sd_stream = None
 
     def toggle_mic(self):
@@ -477,8 +471,7 @@ class DictateWindow(Adw.ApplicationWindow):
         return False
 
     def copy_and_hide(self):
-        # Provisional text is still text the user said. Keep it instead of
-        # deleting it the way clear_provisional() would.
+        # Keep the provisional text; clear_provisional() would drop it.
         if self.mark_prov:
             self.buffer.delete_mark(self.mark_prov)
             self.mark_prov = None
@@ -490,8 +483,7 @@ class DictateWindow(Adw.ApplicationWindow):
         self.hide_session()
 
     def hide_session(self):
-        """Park the app: stop the mic, clear the buffer, keep the process alive
-        so the global shortcut still works."""
+        """Hide the window and release the mic, leaving the process running."""
         self.stop_listening()
         self.clear_text()
         self.set_visible(False)
@@ -521,7 +513,7 @@ class DictationApp(Adw.Application):
         self.cpus = cpus
 
     def do_activate(self):
-        # A hidden window must not end the process, or the shortcut dies with it.
+        # Stay alive while the window is hidden, so the shortcut keeps working.
         self.hold()
         if self.props.active_window:
             self.props.active_window.present()
