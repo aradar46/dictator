@@ -4,6 +4,8 @@
 
 Dictator is a small GTK4/libadwaita app for GNOME. Press Ctrl+Alt+Space, speak, press Enter, and the text is on your clipboard. Transcription runs on your own CPU with [Moonshine Voice](https://moonshine.ai). Nothing leaves your machine.
 
+<img src="media/gtk.png" width="640" alt="The Dictator window transcribing speech">
+
 ## Install
 
 Download `Dictator.flatpak` from the [latest release](https://github.com/aradar46/dictator/releases/latest), then:
@@ -27,29 +29,29 @@ First launch downloads about 640 MB of speech models into the app's cache. After
 
 The first time Dictator runs, GNOME asks whether to allow the shortcut. It has to be approved or the key does nothing. GNOME owns the binding after that, so you can rebind it in Settings under Keyboard.
 
-Dictator keeps running with the window hidden so the shortcut stays live. It shows up under **Background Apps** in the GNOME system menu, which is also where you quit it. `Ctrl+Q` in the window quits too.
+`Esc` parks Dictator: the window disappears, the microphone is released, and the process stays alive so the shortcut still works. It shows up under **Background Apps** in the GNOME system menu while parked. Closing the window with the X button quits for real, as does `Ctrl+Q`, and then the shortcut stops working until you launch it again.
 
 ## Use
 
 The window starts listening as soon as the models are loaded. Words appear in blue italic while Moonshine is still deciding, then settle into plain text once committed.
 
-| Key | Does |
-|---|---|
-| `Enter` | Copy everything to the clipboard and hide |
-| `Shift+Enter` | New line |
-| `Esc` | Hide without copying |
-| `Ctrl+Q` | Quit for real |
+| Key             | Does                                          |
+| --------------- | --------------------------------------------- |
+| `Enter`       | Copy everything to the clipboard and hide     |
+| `Shift+Enter` | New line                                      |
+| `Esc`         | Hide without copying, keep the shortcut alive |
+| `Ctrl+Q`      | Quit                                          |
 
 The microphone button in the header bar pauses and resumes. These phrases work while dictating:
 
-| Say | Does |
-|---|---|
-| "new line" | Line break |
-| "scratch that" | Undo the last committed phrase |
-| "delete word" | Delete the last word |
-| "delete sentence" | Delete back to the previous sentence |
-| "stop dictation" / "pause dictation" | Pause listening |
-| "start dictation" / "resume dictation" | Resume listening |
+| Say                                    | Does                                 |
+| -------------------------------------- | ------------------------------------ |
+| "new line"                             | Line break                           |
+| "scratch that"                         | Undo the last committed phrase       |
+| "delete word"                          | Delete the last word                 |
+| "delete sentence"                      | Delete back to the previous sentence |
+| "stop dictation" / "pause dictation"   | Pause listening                      |
+| "start dictation" / "resume dictation" | Resume listening                     |
 
 ## Models
 
@@ -83,12 +85,12 @@ The manifest pulls `moonshine-voice` from PyPI at build time, so the build needs
 
 The Flatpak asks for four things and nothing else. No filesystem access, no home directory, no arbitrary D-Bus.
 
-| Permission | Why |
-|---|---|
-| `--socket=wayland` | Draws the window. Wayland only, no X11 fallback. |
+| Permission              | Why                                                                     |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `--socket=wayland`    | Draws the window. Wayland only, no X11 fallback.                        |
 | `--socket=pulseaudio` | Records the microphone. This is the PipeWire socket on current systems. |
-| `--share=network` | Downloads the speech models on first run. Nothing is uploaded. |
-| `--device=dri` | GPU rendering for the GTK4 window. |
+| `--share=network`     | Downloads the speech models on first run. Nothing is uploaded.          |
+| `--device=dri`        | GPU rendering for the GTK4 window.                                      |
 
 Models live in the app's own sandboxed cache (`~/.var/app/io.github.aradar46.Dictator/`), not in your home directory.
 
@@ -97,6 +99,8 @@ Models live in the app's own sandboxed cache (`~/.var/app/io.github.aradar46.Dic
 ```sh
 ./run.sh
 ```
+
+<img src="media/web.png" width="720" alt="The browser version of Dictator">
 
 This builds a virtualenv and starts a local web version at `http://127.0.0.1:8000`, using the same engine through a browser tab instead of a GTK window. It blocks every outbound connection except loopback unless you pass `--allow-network`. Useful on distros where GTK4 and libadwaita are awkward, and it is the only part of this repo that is not Linux specific.
 
@@ -107,7 +111,6 @@ This builds a virtualenv and starts a local web version at `http://127.0.0.1:800
 - `wl-clipboard` is bundled into the Flatpak on purpose. Without it the clipboard selection dies the moment the app quits, which is every time you press Enter.
 - PortAudio is built into the Flatpak too, since the GNOME runtime does not ship it and `sounddevice` will not open a microphone without it.
 - The shortcut goes through `org.freedesktop.portal.GlobalShortcuts`. Sandboxed apps cannot grab hotkeys directly, and the portal needs a Wayland surface handle to bind against, which is another reason there is no X11 fallback.
-- Closing the window parks the app instead of ending it. That is what keeps the shortcut alive, and why there is a separate Quit.
 
 ## License
 

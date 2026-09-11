@@ -110,6 +110,7 @@ class DictateWindow(Adw.ApplicationWindow):
 
         self.shortcuts = None
         self.connect("map", lambda _: self.bind_shortcut())
+        self.connect("close-request", self.on_close_request)
 
         # Start loading model in background thread
         threading.Thread(target=self.load_model_worker, daemon=True).start()
@@ -261,6 +262,7 @@ class DictateWindow(Adw.ApplicationWindow):
     def stop_listening(self):
         if self.agent and self.is_listening:
             self.agent.stop_listening()
+            self.release_microphone()
             self.is_listening = False
             self.status_label.set_label("Paused")
             self.status_label.remove_css_class("status-listening")
@@ -277,7 +279,7 @@ class DictateWindow(Adw.ApplicationWindow):
         def exported(toplevel, handle, *_):
             print(f"[shortcut] wayland handle exported", flush=True)
             self.shortcuts = PortalShortcuts(
-                on_activated=lambda token: GLib.idle_add(self.toggle_dictation),
+                on_activated=lambda token: GLib.idle_add(self.toggle_dictation, token),
                 on_bound=lambda trigger, _: print(f"[shortcut] bound to {trigger}", flush=True),
                 on_error=lambda msg: print(f"[shortcut] {msg}", flush=True),
             )
@@ -286,16 +288,19 @@ class DictateWindow(Adw.ApplicationWindow):
 
         surface.export_handle(exported)
 
-    def toggle_dictation(self):
+    def present_with_token(self, token):
+        """Wayland only raises a window that presents an activation token."""
+        if token:
+            self.set_startup_id(token)
+        self.present()
+
+    def toggle_dictation(self, token=None):
         """Show and listen if parked, otherwise pause and resume in place.
         The text stays on screen either way; Enter is what copies it."""
-        if not self.get_visible():
-            self.present()
-            self.start_listening()
-        elif self.is_listening:
+        if self.is_listening:
             self.stop_listening()
         else:
-            self.present()
+            self.present_with_token(token)
             self.start_listening()
         return GLib.SOURCE_REMOVE
 
@@ -317,6 +322,23 @@ class DictateWindow(Adw.ApplicationWindow):
                      "Offline speech to text, powered by Moonshine Voice.",
         )
         about.present()
+
+    def release_microphone(self):
+        """AgentFlow.stop_listening() stops the transcriber but leaves the
+        PortAudio stream open, so GNOME keeps showing the recording indicator.
+        MicTranscriber.close() would release it but also tears down the loaded
+        model.
+        ponytail: reaches into _sd_stream; MicTranscriber.start() recreates it
+        on its own, so this is the library's own resume path.
+        ceiling: private attribute, may move in a moonshine-voice update.
+        upgrade: drop this once the library grows a public pause/release call."""
+        stream = getattr(self.mic, "_sd_stream", None)
+        if stream is not None:
+            try:
+                stream.close()
+            except Exception as e:
+                print(f"[mic] release failed: {e}", flush=True)
+            self.mic._sd_stream = None
 
     def toggle_mic(self):
         if self.is_listening:
@@ -455,7 +477,11 @@ class DictateWindow(Adw.ApplicationWindow):
         return False
 
     def copy_and_hide(self):
-        self.clear_provisional()
+        # Provisional text is still text the user said. Keep it instead of
+        # deleting it the way clear_provisional() would.
+        if self.mark_prov:
+            self.buffer.delete_mark(self.mark_prov)
+            self.mark_prov = None
         start = self.buffer.get_start_iter()
         end = self.buffer.get_end_iter()
         text = self.buffer.get_text(start, end, False).strip()
@@ -470,6 +496,10 @@ class DictateWindow(Adw.ApplicationWindow):
         self.clear_text()
         self.set_visible(False)
 
+    def on_close_request(self, *_):
+        self.quit_app()
+        return False
+
     def quit_app(self):
         if self.shortcuts:
             self.shortcuts.close()
@@ -478,7 +508,6 @@ class DictateWindow(Adw.ApplicationWindow):
                 self.agent.stop_listening()
             except Exception:
                 pass
-        self.close()
         self.app.quit()
 
 
@@ -507,7 +536,6 @@ class DictationApp(Adw.Application):
         )
 
         win = DictateWindow(self, model_name=self.model_name, device=self.device)
-        win.set_hide_on_close(True)
         win.present()
 
 
